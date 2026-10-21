@@ -377,8 +377,8 @@ impl GameContract {
     /// The caller must provide an ED25519 signature (from the backend signing
     /// service) over `SHA256(wasm_hash)`.
     pub fn upgrade(env: Env, wasm_hash: BytesN<32>, signature: BytesN<64>) {
-        let admin_pubkey = Self::admin_public_key(&env)
-            .unwrap_or_else(|error| panic_with_error!(&env, error));
+        let admin_pubkey =
+            Self::admin_public_key(&env).unwrap_or_else(|error| panic_with_error!(&env, error));
 
         let payload: Bytes = wasm_hash.clone().into();
         let digest_bytesn: BytesN<32> = env.crypto().sha256(&payload).into();
@@ -523,6 +523,20 @@ impl GameContract {
             return Err(ContractError::ContractPaused);
         }
         Ok(())
+    }
+
+    /// Internal helper — the backend's ED25519 public key stored by `initialize`.
+    /// Returns Err(ContractError::NotInitialized) when it is missing or isn't
+    /// 32 bytes (`initialize` rejects any other length).
+    fn admin_public_key(env: &Env) -> Result<BytesN<32>, ContractError> {
+        let admin_key_bytes: Bytes = env
+            .storage()
+            .instance()
+            .get(&ADMIN_KEY)
+            .ok_or(ContractError::NotInitialized)?;
+        admin_key_bytes
+            .try_into()
+            .map_err(|_| ContractError::NotInitialized)
     }
 
     /// Reentrancy guard (#860): reject a call if another guarded call is

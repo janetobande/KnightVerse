@@ -47,28 +47,30 @@ impl MigrationTrait for Migration {
                             .not_null()
                             .default(false),
                     )
-                    .foreign_key(
-                        ForeignKey::create()
-                            .name("fk_refresh_tokens_player_id")
-                            .from(RefreshTokens::Table, RefreshTokens::PlayerId)
-                            .to(Players::Table, Players::Id)
-                            .on_delete(ForeignKeyAction::Cascade),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_refresh_tokens_family_id")
-                            .col(RefreshTokens::FamilyId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_refresh_tokens_player_id")
-                            .col(RefreshTokens::PlayerId),
-                    )
-                    .index(
-                        Index::create()
-                            .name("idx_refresh_tokens_token_hash")
-                            .col(RefreshTokens::TokenHash),
-                    )
+                    // No foreign key: auth derives this integer id from the
+                    // player's UUID (see api::auth), so it isn't a row id in
+                    // any table.
+                    .to_owned(),
+            )
+            .await?;
+
+        // Postgres has no inline INDEX clause in CREATE TABLE, so the lookup
+        // indexes are separate statements (token_hash is already UNIQUE).
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_refresh_tokens_family_id")
+                    .table(RefreshTokens::Table)
+                    .col(RefreshTokens::FamilyId)
+                    .to_owned(),
+            )
+            .await?;
+        manager
+            .create_index(
+                Index::create()
+                    .name("idx_refresh_tokens_player_id")
+                    .table(RefreshTokens::Table)
+                    .col(RefreshTokens::PlayerId)
                     .to_owned(),
             )
             .await
@@ -94,8 +96,3 @@ enum RefreshTokens {
     IsRevoked,
 }
 
-#[derive(Iden)]
-enum Players {
-    Table,
-    Id,
-}
